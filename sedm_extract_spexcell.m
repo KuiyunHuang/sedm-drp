@@ -4,7 +4,7 @@ function SegmentsInfo=sedm_extract_spexcell(varargin)
 % Description: Given a SEDM SegmentsInfo structure returned by
 %              sedm_generate_spexcell_segmentation.m and a science or
 %              calibration image, search for the exact position and slope
-%              of the trace in eac spexcell using the SegmentsInfo as a
+%              of the trace in each spexcell using the SegmentsInfo as a
 %              first guess.
 % Input  : * Arbitrary number of pairs of ...,key,val,.. arguments.
 %            The following keywords are available:
@@ -18,6 +18,10 @@ function SegmentsInfo=sedm_extract_spexcell(varargin)
 %                      cell, structure or any of the inputs allowed by
 %                      read2sim.m
 %                      This parameter must be provided.
+%            'Gain'  - The CCD Gain (scalar) or a the CCD Gain header
+%                      keyword (string). Default is 'GAIN'.
+%                      All the output spexcells will returned in e- units.
+%                      If empty, don't apply Gain.
 %            'OffsetType' - {'measured','smooth'} indicate which trace
 %                      offset estimate to use. The one directly measured
 %                      in each spexcell (i.e., SegmentsInfo.MeasuredOffset)
@@ -76,7 +80,7 @@ function SegmentsInfo=sedm_extract_spexcell(varargin)
 %                              surface to the MeasuredOffset offset
 %                              parameter, as a function of x/y position.
 %            .Back           - The background in ADU subtracted from each
-%                              spexcell. 
+%                              spexcell.
 %          - A structure with the parameters of the 2-D best fit surface
 %            fitted to the offset as a function of position.
 %            .Res    - the results from fit_2d_polysurface.m
@@ -94,6 +98,7 @@ ImageField    = 'Im';   % read2sim structure definitions
 
 DefV.SI                        = [];
 DefV.ScienceImage              = [];
+DefV.Gain                      = 'GAIN';
 DefV.OffsetType                = 'smooth';   % {'measured','smooth'}
 DefV.SemiWidthExtractionBlock  = 4;
 DefV.SemiWidthMeasuredBlock    = 3;
@@ -106,7 +111,6 @@ DefV.SubSpexcellBack           = 'all';   %{'spex','all','non'}
 DefV.IgnoreEdge                = 2;
 DefV.MultiThred                = 1;
 InPar = set_varargin_keyval(DefV,'y','use',varargin{:});
-
 
 if (isempty(InPar.SI)),
     error('SegmentsInfo structure (SI) must be provided');
@@ -124,8 +128,23 @@ end
 
 SIM = read2sim(InPar.ScienceImage);
 ScienceImage = SIM.(ImageField);
-InPar = rmfield(InPar,'ScienceImage');
+%InPar = rmfield(InPar,'ScienceImage');
 
+if (~isempty(InPar.Gain)),
+    if (ischar(InPar.Gain)),
+        % get Gain from header keyword
+        if (ischar(InPar.ScienceImage)),
+            [KeywordVal]=get_fits_keyword(InPar.ScienceImage,{InPar.Gain});
+            InPar.Gain = KeywordVal{1};
+        else
+            % can't read Gain - set it to empty
+            warning('Cannot read Gain from header - set Gain to empty');
+            InPar.Gain = [];
+        end
+    end
+end
+            
+           
 % image size vectors
 VecX        = (1:1:size(ScienceImage,2)).';
 VecY        = (1:1:size(ScienceImage,1)).';
@@ -191,6 +210,14 @@ for Iseg=1:1:Nseg,
     SpexSpecBlock = interp2fast(VecX,VecY,ScienceImage,...
                                 GridX,GridY,InPar.Interp2Method);
 
+    %if (~isempty(InPar.Gain)),
+    %    SpexSpecBlock = SpexSpecBlock.*InPar.Gain;
+    %    SegmentsInfo(Iseg).Units = 'e-';
+    %else
+    %    SegmentsInfo(Iseg).Units = 'ADU';
+    %end
+    
+    
     SegmentsInfo(Iseg).SpexSpecBlock = SpexSpecBlock;
     
     % Extract 1d spectrum for each spex
@@ -245,7 +272,7 @@ for Iseg=1:1:Nseg,
     %Par = inv(SegmentsInfo(Iseg).NormalizedProfile.'*SegmentsInfo(Iseg).NormalizedProfile)*SegmentsInfo(Iseg).NormalizedProfile.'*SegmentsInfo(Iseg).BS_SpexSpecBlock;
     SegmentsInfo(Iseg).SpexSpecFit        = Par;
     % quick error estimate
-    SegmentsInfo(Iseg).SpexSpecFitErr     = sqrt(SegmentsInfo(Iseg).SpexSpecFit + Back);
+    SegmentsInfo(Iseg).SpexSpecFitErr     = sqrt(SegmentsInfo(Iseg).SpexSpecFit + Back).*sqrt(InPar.Gain);
     SegmentsInfo(Iseg).SpexSpecFitResid   = Y - H*Par;
     SegmentsInfo(Iseg).SpexSpecFitChi2    = sum(SegmentsInfo(Iseg).SpexSpecFitResid.^2./SegmentsInfo(Iseg).SpexSpecBlock(1+InPar.IgnoreEdge:1:Nby-InPar.IgnoreEdge,:),1);
     
