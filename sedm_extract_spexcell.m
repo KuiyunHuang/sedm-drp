@@ -193,6 +193,10 @@ for Iseg=1:1:Nseg,
     YI      = polyval(AllPar1(Iseg,:).',XI);
     XI      = XI + SegmentsInfo(Iseg).MeanX;
     
+    % X and Y position of the extrcated block center
+    SegmentsInfo(Iseg).BlockCenterX = XI;
+    SegmentsInfo(Iseg).BlockCenterY = YI;
+    
     Slope             = AllPar1(Iseg,1);
     CosArcTanSlope    = sqrt(1 + Slope.^2);
     CosArcTanInvSlope = sqrt(1 + Slope.^(-2));
