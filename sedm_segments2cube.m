@@ -79,7 +79,7 @@ DefV.Interp1Method             = 'cubic';
 DefV.CubeInterp                = 'griddata';   % {'griddata'|'tri'} The Delaunay triangulation
 DefV.Interp2Method             = 'cubic';
 
-DefV.Filter                    = 'medfilt1';
+DefV.Filter                    = 'none';
 DefV.FilterPars                = {3};
 DefV.SpexImSize                = [60 60];
 DefV.VecOnSkyX                 = (-13:0.5:17.5);  %(-18:0.5:18);
